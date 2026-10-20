@@ -52,6 +52,6 @@ for (const file of await files(root)) {
   assert.equal(checked.status, 0, checked.stderr);
 }
 const { version } = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
-assert.deepEqual(await readFile(path.join(root, `우리가-남긴-별-v${version}.html`)), await readFile(path.join(root, 'verification/우리가-남긴-별-v2.html')));
-assert.ok((await stat(path.join(root, 'downloads/stars-we-leave-v0.2.1.zip'))).size > 0);
+assert.deepEqual(await readFile(path.join(root, `우리가-남긴-별-v${version}.html`)), await readFile(path.join(root, 'verification/우리가-남긴-별-v3.html')));
+assert.ok((await stat(path.join(root, `downloads/stars-we-leave-v${version}.zip`))).size > 0);
 console.log(`Verified ${sourceFiles.length} mirrored game files, ${references} relative references, standalone output, ZIP presence, and all .mjs syntax.`);

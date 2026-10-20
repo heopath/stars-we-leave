@@ -1,4 +1,5 @@
-import { AGES, PALETTE, GIFTS, chance, castFor, newLife, currentScene, advance, derive, summarize, nextGeneration, deserialize, constellationPoints } from './life.mjs';
+import { AGES, PALETTE, GIFTS, chance, castFor, newLife, currentScene, currentDetour, explore, advance, derive, summarize, nextGeneration, deserialize, constellationPoints } from './life.mjs';
+import {WORLD, LANDMARKS, SPAWN, clampPoint, cameraFor,project,unproject,walk} from './world.mjs';
 
 const $ = id => document.getElementById(id);
 const canvas = $('universe'), ctx = canvas.getContext('2d');
@@ -10,12 +11,13 @@ let W = innerWidth, H = innerHeight, mobile = W <= 760, now = 0, lastTime = 0;
 let player = {x:.5,y:.78}, target = null, trail = [], keys = new Set(), nodes = [], starNodes = [];
 let memoryMode = 'read', soundOn = false, soundContext = null, soundTimer = 0, savedOkay = true, unreadableSave = null, protectUnknownSave = false;
 let lastNear = -1, displaySummary = null, newGenerationAt = 0;
+let activePlace=0, camera=cameraFor(SPAWN,W,H);
 const dialogs = [...document.querySelectorAll('dialog')];
 const stars = Array.from({length:170},(_,i)=>({x:chance(14253,i),y:chance(57127,i),r:.3+chance(9495,i)*1.2,phase:chance(12,i)*6.28}));
 const anyDialog = () => dialogs.some(d=>d.open);
 const seed = () => crypto.getRandomValues(new Uint32Array(1))[0];
 const say = text => { $('live-region').textContent = text; };
-const text = (id,value) => { $(id).textContent = value; };
+const text = (id,value) => { const el=$(id),next=String(value);if(el.textContent!==next)el.textContent=next; };
 function element(tag, className, content) { const el=document.createElement(tag); if(className)el.className=className; if(content!==undefined)el.textContent=content; return el; }
 function safeLoad() {
   try {
@@ -85,10 +87,10 @@ function downloadOldSave() {
     text('restart-status','이전 기록 파일 다운로드를 시작했습니다. 내려받은 파일이 있는지 확인해 주세요.');
   } catch {text('restart-status','파일을 내려받지 못했습니다. 원래 기록은 그대로 보존되어 있습니다.');}
 }
-function startScene() {
+function startScene(keepPosition=false) {
   scene=currentScene(life); if(!scene){showEnding();return;}
   setView('living'); selected=null; lastNear=-1;
-  player={x:.5,y:mobile?.78:.79}; trail=[];
+  if(!keepPosition){player={...SPAWN};trail=[];}
   text('era',scene.era); text('age',scene.age);
   text('place',scene.step===0?'처음의 작은 마당':scene.state.home==='city'?'낯선 도시의 하루':scene.state.home==='sea'?'바다가 보이는 마을':'익숙한 동네의 하루');
   text('scene-kind',scene.kind); text('scene-title',scene.title); text('scene-text',scene.text);
@@ -97,22 +99,45 @@ function startScene() {
   const gift=life.ancestors.at(-1)?.gift;
   $('inheritance-hint').hidden=!gift;
   if(gift)text('inheritance-hint',`${GIFTS[gift].symbol} 물려받은 ${GIFTS[gift].object}\n먼저 살았던 사람의 마음이 곁에 있습니다.`);
-  $('paths').replaceChildren();
-  scene.choices.forEach((c,i)=>{
+  $('paths').replaceChildren();$('map-places').replaceChildren();
+  scene.places.forEach((name,i)=>{
+    const c=scene.choices[i],visited=life.wander.some(v=>v.step===scene.step&&v.place===i);
     const b=element('button','path-node'); b.style.setProperty('--node',PALETTE[c.tag]);
-    b.setAttribute('aria-label',`${c.who} · ${c.title}`);
-    b.append(element('span','path-symbol',symbols[c.tag]),element('span','path-who',c.who),element('span','path-title',c.title),element('span','path-arrow','다가가 살펴보기 ↗'));
-    b.onclick=()=>{if(anyDialog())return;lastNear=-1;target={...nodes[i],index:i};text('travel-hint',`${c.who}에게 향하는 중…`);};
+    b.setAttribute('aria-label',`${name} 둘러보기`);
+    b.append(element('span','path-symbol',['⌂','✧','⌁'][i]),element('span','path-who',visited?'작은 만남을 기억한 곳':'작은 만남 · 2개의 선택'),element('span','path-title',name),element('span','path-arrow','다가가 둘러보기 ↗'));
+    b.onclick=()=>goToPlace(i);
     $('paths').append(b);
+    const m=element('button','map-place',name);m.setAttribute('aria-label',`${name} 찾아가기`);m.style.setProperty('--node',PALETTE[c.tag]);
+    m.append(element('small','',visited?'머문 곳':'아직 모르는 이야기'));m.onclick=()=>goToPlace(i);$('map-places').append(m);
   });
-  layoutNodes(); renderRelations(); text('travel-hint','마음이 향하는 빛에 다가가 보세요.');
+  layoutNodes(); renderRelations(); text('travel-hint','어느 방향이든 걸어보세요. 장소를 고르면 찾아갑니다.');
+  text('wander-count',`이 시기의 작은 만남 ${life.wander.filter(v=>v.step===scene.step).length} / 3`);
   say(`${scene.age}살. ${scene.title}. ${scene.text}`);
 }
 function layoutNodes() {
-  nodes=mobile ? [{x:.23,y:.51},{x:.77,y:.55},{x:.49,y:.70}] : [{x:.35,y:.39},{x:.64,y:.45},{x:.43,y:.65}];
-  if(mobile && H<710) nodes=[{x:.23,y:.52},{x:.77,y:.56},{x:.49,y:.72}];
-  [...$('paths').children].forEach((b,i)=>{ b.style.left=`${nodes[i].x*100}%`; b.style.top=`${nodes[i].y*100}%`; });
+  nodes=LANDMARKS;
   if(view==='afterlife')layoutStars();
+}
+function goToPlace(i){if(anyDialog())return;target={...nodes[i],index:i};text('travel-hint',`${scene.places[i]}에 가는 중 · 방향키로 언제든 다른 곳에 갈 수 있어요.`);}
+function openPlace(index) {
+  if(view!=='living'||anyDialog())return;
+  activePlace=index;target=null;lastNear=index;
+  text('visit-title',scene.places[index]);text('visit-note','잠깐 머물거나, 이곳에서 앞으로의 삶을 골라보세요.');
+  $('visit-moment').replaceChildren();$('visit-choices').replaceChildren();
+  const moment=currentDetour(life,index);
+  if(moment){
+    $('visit-moment').append(element('small','eyebrow','나이를 넘기지 않는 작은 만남'),element('h3','',moment.title),element('p','',moment.text));
+    moment.choices.forEach(c=>{const b=element('button','moment-action',`${c.title} →`);b.onclick=()=>{selected={...c,detour:index};closeDialog('visit-dialog');openChoice();};$('visit-moment').append(b);});
+  } else {
+    $('visit-moment').append(element('small','eyebrow','이곳에서 기억한 순간'),element('p','',derive(life).detours.find(r=>r.step===scene.step&&r.place===index)?.memory||'마음에 남은 이야기를 기억장에 적어 두었습니다.'));
+  }
+  const groups=[
+    [[0,1],[3,4],[2,5]],[[3,4],[0,1],[2,5]],[[0,2],[1,3],[4,5]],
+    [[0,1],[2,3],[4,5]],[[0,2],[1,3],[4,5]],[[0,1],[3,4],[2,5]],
+    [[0,2],[1,3],[4,5]],[[0,3],[1,5],[2,4]],[[0,1],[2,4],[3,5]]
+  ];
+  groups[scene.step][index].forEach(i=>{const c=scene.choices[i];if(!c)return;const b=element('button','life-option');b.style.setProperty('--node',PALETTE[c.tag]);b.append(element('small','',c.who),element('strong','',c.title),element('span','',c.detail));b.onclick=()=>{closeDialog('visit-dialog');inspect(i);};$('visit-choices').append(b);});
+  showDialog('visit-dialog');
 }
 function renderRelations() {
   const s=scene.state, cast=castFor(life), items=[['어머니',scene.age>=64?'기억 속에서':'익숙한 온기','care'],[cast.friend,s.friend>=3?'다시 닿은 마음':s.distance?'멀리 있는 인연':'알아가는 사이','bond']];
@@ -123,13 +148,22 @@ function renderRelations() {
 function inspect(index) {
   if(view!=='living'||anyDialog())return;
   selected=scene.choices[index];lastNear=index;target=null;
+  openChoice();
+}
+function openChoice(){
   text('choice-who',`${scene.age}살 · ${selected.who}`);text('choice-title',selected.title);text('choice-text',selected.detail);
+  text('choice-note',selected.detour!==undefined?'이 작은 만남 뒤에는 같은 나이로 돌아옵니다. 다른 장소도 계속 둘러볼 수 있어요.':'이 선택은 이 시기를 마무리하고 다음 나이로 이어집니다. 아직 다른 장소를 둘러봐도 괜찮아요.');
+  text('choose-path',selected.detour!==undefined?'이 순간에 머무르기 →':'이 삶을 선택하고 다음 시기로 →');
   $('choice-art').innerHTML=illustration(selected.tag,scene.age);
   showDialog('choice-dialog');
 }
 function commitChoice() {
   if(!selected || !scene || view!=='living')return;
   const chosen=selected; selected=null;
+  if(chosen.detour!==undefined){
+    life=explore(life,chosen.detour,chosen.id);persist();closeDialog('choice-dialog');playChord(chosen.tag);
+    showMemory(derive(life).detours.at(-1),'wander');return;
+  }
   try { life=advance(life,scene.id,chosen.id); } catch { closeDialog('choice-dialog');startScene();return; }
   persist();closeDialog('choice-dialog');
   playChord(chosen.tag);showMemory(derive(life).records.at(-1),'continue');
@@ -140,10 +174,10 @@ function showMemory(record, mode='read') {
   text('memory-content',record.memory);text('memory-echo',record.echo);
   $('memory-turn').hidden=!record.turn;text('memory-turn',record.turn?`✧ ${record.turn}`:'');
   $('memory-art').innerHTML=illustration(record.tag,record.age);
-  $('memory-next').replaceChildren(document.createTextNode(mode==='continue'?(life.choices.length===9?'나의 삶을 별로 남기기':'삶은 계속 흘러갑니다'):'기억에서 돌아가기'),element('span','',mode==='continue'?'→':'↩'));
+  $('memory-next').replaceChildren(document.createTextNode(mode==='continue'?(life.choices.length===9?'나의 삶을 별로 남기기':'삶은 계속 흘러갑니다'):mode==='wander'?'같은 하루, 다른 곳으로 걸어가기':'기억에서 돌아가기'),element('span','',mode==='continue'?'→':'↩'));
   showDialog('memory-dialog');say(`${record.title}. ${record.memory}`);
 }
-function finishMemory() {closeDialog('memory-dialog');if(memoryMode==='continue')startScene();}
+function finishMemory() {closeDialog('memory-dialog');if(memoryMode==='continue')startScene();else if(memoryMode==='wander')startScene(true);}
 function showEnding() {
   displaySummary=summarize(life); setView('afterlife');
   text('ending-name',displaySummary.title);text('ending-line',displaySummary.line);text('download-status','');
@@ -169,15 +203,16 @@ function beginDescendant() {
 }
 function showJournal() {
   $('ancestor-list').replaceChildren();
-  const entries=(life?.ancestors||[]).map((a,i)=>({name:`${i+1}번째 삶 · ${a.title}`,records:a.records,summary:a}));
-  entries.push({name:life?.ancestors.length?`${life.ancestors.length+1}번째 삶 · 지금의 나`:'지금의 나',records:life?derive(life).records:[]});
+  const ordered=(records,detours=[])=>[...records,...detours].sort((a,b)=>a.age-b.age||(a.place!==undefined?-1:1));
+  const entries=(life?.ancestors||[]).map((a,i)=>({name:`${i+1}번째 삶 · ${a.title}`,records:ordered(a.records,a.detours),summary:a}));
+  entries.push({name:life?.ancestors.length?`${life.ancestors.length+1}번째 삶 · 지금의 나`:'지금의 나',records:life?ordered(derive(life).records,derive(life).detours):[]});
   entries.forEach((entry,i)=>{const b=element('button','ancestor-chip',entry.name);b.onclick=()=>selectJournal(i);$('ancestor-list').append(b);});
   function selectJournal(index) {
     [...$('ancestor-list').children].forEach((el,i)=>{el.classList.toggle('active',i===index);el.setAttribute('aria-pressed',String(i===index));});
     const entry=entries[index];$('journal-records').replaceChildren();
     if(entry.summary){const p=element('p','journal-intro',`${entry.summary.line} 남긴 것: ${GIFTS[entry.summary.gift].title}.`);$('journal-records').append(p);}
     if(!entry.records.length){$('journal-records').append(element('p','empty-journal','아직 쓰이지 않은 시간입니다. 첫 만남을 향해 걸어가 보세요.'));return;}
-    entry.records.forEach(r=>{const article=element('article','journal-entry');article.append(element('small','',`${r.age}살 · ${r.who}`),element('h3','',r.title),element('p','',r.memory));$('journal-records').append(article);});
+    entry.records.forEach(r=>{const article=element('article','journal-entry');article.append(element('small','',`${r.age}살 · ${r.place!==undefined?'산책 중 만난 순간 · ':''}${r.who}`),element('h3','',r.title),element('p','',r.memory));$('journal-records').append(article);});
   }
   selectJournal(entries.length-1);showDialog('journal-dialog');
 }
@@ -199,7 +234,7 @@ function illustration(tag,age) {
 function resize() {
   const oldMobile=mobile; W=innerWidth;H=innerHeight;mobile=W<=760;
   const dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
-  layoutNodes();if(oldMobile!==mobile&&view==='living'){player={x:.5,y:mobile?.78:.79};trail=[];target=null;}
+  layoutNodes();if(oldMobile!==mobile&&view==='living')target=null;
 }
 function glow(x,y,r,color,alpha=1) {
   const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,color+'80');g.addColorStop(.25,color+'25');g.addColorStop(1,color+'00');ctx.globalAlpha=alpha;ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2);ctx.globalAlpha=1;
@@ -247,15 +282,38 @@ function drawWelcome() {
 }
 function drawLiving() {
   if(!scene)return;
-  // Separate lives drift close, cross briefly, and continue in their own direction.
-  ribbon(.22,1,.24,.20,'#91d8dc',.7,.14,.17);ribbon(.83,1,.65,.17,'#b9b0ed',.7,.17,-.22);
-  ribbon(.5,1,.5,.78,'#f1d49d',2,.65,.04);
-  nodes.forEach((n,i)=>{const c=scene.choices[i];ribbon(.5,.80,n.x,n.y,PALETTE[c.tag],1,.18,i===1?.12:-.08);glow(n.x*W,(n.y*H)-30,48,PALETTE[c.tag],.2);});
-  if(trail.length>1){ctx.lineWidth=1.4;ctx.strokeStyle='#edcf97';ctx.globalAlpha=.7;ctx.beginPath();trail.forEach((p,i)=>i?ctx.lineTo(p.x*W,p.y*H):ctx.moveTo(p.x*W,p.y*H));ctx.stroke();ctx.globalAlpha=1;}
-  const px=player.x*W,py=player.y*H;
-  glow(px,py,reduced.matches?24:27+Math.sin(now*2)*3,'#f3d39e',.85);point(px,py,3.2,'#f9e7c1',false);
-  ctx.strokeStyle='#eddaa955';ctx.lineWidth=.7;ctx.beginPath();ctx.arc(px,py,10,0,6.29);ctx.stroke();
-  if(trail.length<2){ctx.fillStyle='#b5b5a4';ctx.font='9px "Malgun Gothic", sans-serif';ctx.textAlign='center';ctx.fillText('나',px,py+25);}
+  camera=cameraFor(player,W,H);
+  ctx.save();ctx.scale(camera.zoom,camera.zoom);ctx.translate(-camera.x,-camera.y);
+  const land=ctx.createLinearGradient(0,120,1500,1100);land.addColorStop(0,'#203e48');land.addColorStop(1,'#183b40');
+  ctx.fillStyle=land;ctx.strokeStyle='#56828466';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(70,160);ctx.bezierCurveTo(450,15,1400,50,1525,280);ctx.bezierCurveTo(1710,670,1500,1040,1250,1050);ctx.bezierCurveTo(860,1150,100,1040,65,810);ctx.bezierCurveTo(-15,590,30,320,70,160);ctx.fill();ctx.stroke();
+  ctx.strokeStyle='#b9b89a17';ctx.lineWidth=36;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(390,470);ctx.bezierCurveTo(550,200,990,160,1130,350);ctx.bezierCurveTo(1340,570,1250,790,1050,870);ctx.bezierCurveTo(730,980,360,800,390,470);ctx.stroke();
+  ctx.lineWidth=1;ctx.strokeStyle='#c9c8ac30';ctx.stroke();
+  ctx.strokeStyle='#80a5ac28';ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(30,930);ctx.bezierCurveTo(480,800,630,670,620,90);ctx.stroke();
+  for(let i=0;i<42;i++){
+    const x=130+chance(601,i)*1330,y=155+chance(777,i)*825;
+    if(LANDMARKS.some(n=>Math.hypot(x-n.x,y-n.y)<160)||Math.hypot(x-SPAWN.x,y-SPAWN.y)<120)continue;
+    ctx.strokeStyle='#b1b99b25';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y-22);ctx.stroke();
+    ctx.fillStyle=i%3===0?'#49665a88':'#35584d';ctx.beginPath();ctx.ellipse(x,y-30,18+i%9,24,0,0,6.29);ctx.fill();
+  }
+  nodes.forEach((n,i)=>{
+    const color=PALETTE[scene.choices[i].tag],x=n.x-62,y=n.y-20;
+    glow(n.x,n.y,145,color,.18);
+    ctx.fillStyle='#0f2934';ctx.fillRect(x-28,y-32,56,42);ctx.strokeStyle='#a3b9b657';ctx.lineWidth=1;ctx.strokeRect(x-28,y-32,56,42);
+    ctx.fillStyle=['#597369','#657480','#777563'][i];ctx.beginPath();ctx.moveTo(x-36,y-32);ctx.lineTo(x,y-61);ctx.lineTo(x+36,y-32);ctx.fill();
+    ctx.fillStyle=color;ctx.globalAlpha=.7;ctx.fillRect(x-15,y-20,10,12);ctx.fillRect(x+5,y-20,10,12);ctx.globalAlpha=1;
+    ctx.strokeStyle=color+'44';ctx.beginPath();ctx.ellipse(n.x,n.y+28,85,38,0,0,6.29);ctx.stroke();
+  });
+  if(trail.length>1){ctx.lineWidth=1.6;ctx.strokeStyle='#edcf9777';ctx.beginPath();trail.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();}
+  if(target){ctx.strokeStyle='#e9d2a033';ctx.setLineDash([3,8]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(player.x,player.y);ctx.lineTo(target.x,target.y);ctx.stroke();ctx.setLineDash([]);ctx.strokeStyle='#e9d2a077';ctx.beginPath();ctx.arc(target.x,target.y,9,0,6.29);ctx.stroke();}
+  glow(player.x,player.y,32,'#f3d39e',.9);point(player.x,player.y,4,'#f9e7c1',false);
+  ctx.strokeStyle='#eddaa977';ctx.lineWidth=1;ctx.beginPath();ctx.arc(player.x,player.y,12,0,6.29);ctx.stroke();ctx.restore();
+  [...$('paths').children].forEach((b,i)=>{const p=project(nodes[i],camera);b.style.left=`${p.x}px`;b.style.top=`${p.y-72*camera.zoom}px`;b.hidden=p.x<70||p.x>W-70||p.y<(mobile?H*.39:210)||p.y>H-95;});
+  const near=nodes.findIndex(n=>Math.hypot(n.x-player.x,n.y-player.y)<115);
+  $('nearby-place').hidden=near<0;
+  if(near>=0){text('nearby-place',`${scene.places[near]} 둘러보기 · E`);$('nearby-place').onclick=()=>openPlace(near);}
+  text('position-label',`나의 발걸음 ${Math.round(player.x)}, ${Math.round(player.y)}`);
+  $('map-player').setAttribute('cx',String(player.x/10));$('map-player').setAttribute('cy',String(player.y/10));
 }
 function drawEnding() {
   if(!displaySummary)return;
@@ -279,19 +337,17 @@ function movePlayer(dt) {
   let dx=0,dy=0;
   if(keys.has('arrowleft')||keys.has('a'))dx--;if(keys.has('arrowright')||keys.has('d'))dx++;
   if(keys.has('arrowup')||keys.has('w'))dy--;if(keys.has('arrowdown')||keys.has('s'))dy++;
-  const keyboard=dx!==0||dy!==0;
-  if(keyboard){target=null;const len=Math.hypot(dx,dy);dx/=len;dy/=len;}
-  else if(target){dx=(target.x-player.x)*W;dy=(target.y-player.y)*H;const len=Math.hypot(dx,dy);if(len<7){player={x:target.x,y:target.y};const index=target.index;target=null;if(index!==undefined)inspect(index);return;}dx/=len;dy/=len;dt=Math.min(dt,len/250);}
+  if(dx||dy){target=null;player=walk(player,{x:dx,y:dy},dt);}
+  else if(target){dx=target.x-player.x;dy=target.y-player.y;const len=Math.hypot(dx,dy);if(len<7){player=clampPoint(target);const index=target.index;target=null;if(index!==undefined)openPlace(index);return;}player=walk(player,{x:dx,y:dy},Math.min(dt,len/300));}
   else return;
-  const prev={...player};player.x=Math.max(.06,Math.min(.94,player.x+dx*dt*250/W));player.y=Math.max(mobile?.41:.24,Math.min(.85,player.y+dy*dt*250/H));
-  if(Math.hypot((prev.x-player.x)*W,(prev.y-player.y)*H)>0.1){trail.push({...player});if(trail.length>700)trail.shift();}
-  if(keyboard){const near=nodes.findIndex(n=>Math.hypot((n.x-player.x)*W,(n.y-player.y)*H)<27);if(near<0)lastNear=-1;else if(near!==lastNear)inspect(near);}
+  trail.push({...player});if(trail.length>700)trail.shift();
 }
 function frame(time) {
   const dt=Math.min((time-lastTime)/1000||0,.04);lastTime=time;
   if(!document.hidden && !anyDialog())now+=dt;
-  movePlayer(dt);landscape();drawAncestors();
+  movePlayer(dt);landscape();
   if(view==='welcome')drawWelcome();else if(view==='living')drawLiving();else if(view==='afterlife')drawEnding();else drawInheritance();
+  drawAncestors();
   requestAnimationFrame(frame);
 }
 
@@ -342,10 +398,16 @@ $('memory-dialog').addEventListener('cancel',e=>{e.preventDefault();finishMemory
 document.addEventListener('keydown',e=>{
   if(anyDialog())return;
   if(e.key==='Escape'){pause();return;}
+  if(e.key.toLowerCase()==='e'&&view==='living'){const near=nodes.findIndex(n=>Math.hypot(n.x-player.x,n.y-player.y)<115);if(near>=0){e.preventDefault();openPlace(near);}return;}
   const k=e.key.toLowerCase();if(view==='living'&&['arrowleft','arrowright','arrowup','arrowdown','a','d','w','s'].includes(k)){e.preventDefault();keys.add(k);}
 });
 document.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
-canvas.addEventListener('pointerdown',e=>{if(view!=='living'||anyDialog())return;const x=e.clientX/W,y=e.clientY/H;if(y<(mobile?.41:.24)||y>.85)return;target={x:Math.max(.06,Math.min(.94,x)),y};lastNear=-1;});
+canvas.addEventListener('pointerdown',e=>{if(view!=='living'||anyDialog())return;target=unproject({x:e.clientX,y:e.clientY},camera);lastNear=-1;text('travel-hint','가고 싶은 곳 어디든. 가까운 장소에서는 E로 이야기를 열어요.');});
+$('close-visit').onclick=$('keep-walking').onclick=()=>closeDialog('visit-dialog');
+for(const b of document.querySelectorAll('[data-walk]')){
+  b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);keys.add(b.dataset.walk);});
+  for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,()=>keys.delete(b.dataset.walk));
+}
 window.addEventListener('blur',()=>{keys.clear();pause();});
 document.addEventListener('visibilitychange',()=>{keys.clear();if(document.hidden){pause();soundContext?.suspend();}else if(soundOn&&!$('pause-dialog').open)soundContext?.resume();});
 window.addEventListener('resize',resize);

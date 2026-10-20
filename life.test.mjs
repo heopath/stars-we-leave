@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {AGES, PALETTE, GIFTS, chance, castFor, newLife, currentScene, advance, derive, summarize, nextGeneration, deserialize, constellationPoints} from './dist/life.mjs';
+import {AGES, PALETTE, GIFTS, chance, castFor, newLife as freshLife, currentScene, advance, derive, summarize, nextGeneration, deserialize, constellationPoints} from './dist/life.mjs';
 
+const newLife = (seed,ancestors=[])=>freshLife(seed,ancestors,2);
 function choose(life,id) { return advance(life,currentScene(life).id,id); }
 function through(seed,choices) { let life=newLife(seed); for(const id of choices)life=choose(life,id);return life; }
 function finish(life,index=0) { while(currentScene(life))life=choose(life,currentScene(life).choices[index].id);return life; }

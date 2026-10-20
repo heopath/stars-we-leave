@@ -1,13 +1,15 @@
 {
   "name": "stars-we-leave",
-  "version": "0.2.1",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node serve.mjs",
     "build": "node verification/build-pages.mjs",
-    "test": "node --test story.test.mjs life.test.mjs ui.test.mjs",
+    "test": "node --test story.test.mjs life.test.mjs wander.test.mjs ui.test.mjs",
     "check": "node verification/verify-pages.mjs"
   }
 }

@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import * as engine from './dist/life.mjs';
+import * as world from './dist/world.mjs';
 
 const SAVE = 'stars-we-leave:lineage:v2';
-const source = readFileSync(new URL('./dist/experience.mjs', import.meta.url), 'utf8').replace(/^import .*?;\r?\n/, '');
+const source = readFileSync(new URL('./dist/experience.mjs', import.meta.url), 'utf8').replace(/^import .*?;\r?\n/gm, '');
 const html = readFileSync(new URL('./dist/index.html', import.meta.url), 'utf8');
 
 // Runs the real UI handlers with a minimal DOM. This is not browser/layout QA.
@@ -40,12 +41,12 @@ function harness(raw = null, options = {}) {
   const document = {
     hidden:false,
     getElementById(id){assert.ok(nodes.has(id),`Unknown element: ${id}`);return nodes.get(id);},
-    querySelectorAll(selector){return [...nodes].filter(([id])=>selector==='dialog'?id.endsWith('-dialog'):['welcome','living','afterlife','inheritance'].includes(id)).map(([,n])=>n);},
+    querySelectorAll(selector){if(selector==='[data-walk]')return [];return [...nodes].filter(([id])=>selector==='dialog'?id.endsWith('-dialog'):['welcome','living','afterlife','inheritance'].includes(id)).map(([,n])=>n);},
     createElement:node,createTextNode:text=>({textContent:text}),addEventListener(){}
   };
   const blobs = [];
   const context = vm.createContext({
-    ...engine,document,localStorage:storage,innerWidth:1280,innerHeight:720,devicePixelRatio:1,
+    ...engine,...world,document,localStorage:storage,innerWidth:1280,innerHeight:720,devicePixelRatio:1,
     window:{addEventListener(){}},matchMedia:()=>({matches:false}),requestAnimationFrame(){},
     crypto:{getRandomValues(a){a[0]=100+(++randomCalls);return a;}},structuredClone,
     Date:{now:()=>12345},Blob,

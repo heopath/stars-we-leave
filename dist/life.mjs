@@ -1,3 +1,4 @@
+import {extraChoices,detourFor,PLACES} from './wander.mjs';
 export const VERSION = 2;
 export const AGES = [8, 16, 24, 33, 42, 53, 64, 75, 84];
 export const ERAS = ['작은 시작','마음이 자라는 날','멀리 가보는 계절','뜻밖의 갈림길','함께 살아가는 날','돌아보는 계절','다시 열리는 문','나누어 갖는 시간','마지막 저녁'];
@@ -9,15 +10,30 @@ export const GIFTS = {
   self: { title:'여행자의 수첩', object:'수첩', line:'세상을 자기 속도로 바라보는 시선', symbol:'⌁', intro:'빛바랜 수첩에는 지명보다 날씨와 냄새가 많다. 길을 잃고도 좋았던 날의 기록이다.' }
 };
 export function chance(seed, salt) { let x = (seed ^ Math.imul(salt + 1, 0x9e3779b1)) >>> 0; x ^= x >>> 16; x = Math.imul(x, 0x7feb352d); x ^= x >>> 15; x = Math.imul(x, 0x846ca68b); x ^= x >>> 16; return (x >>> 0) / 4294967296; }
-export function newLife(seed, ancestors = []) {
+export function newLife(seed, ancestors = [], edition = 3) {
   if (!Number.isInteger(seed) || seed < 0 || seed > 4294967295) throw new Error('Invalid seed');
-  return { version: VERSION, seed, ancestors: structuredClone(ancestors), choices: [] };
+  return { version: VERSION, edition, seed, ancestors: structuredClone(ancestors), choices: [], wander: [] };
 }
 function choice(id, who, title, detail, tag, effect, memory, echo, extra = {}) { return {id,who,title,detail,tag,effect,memory,echo,...extra}; }
 function event(id,title,text,kind,choices) { return {id,title,text,kind,choices}; }
 export function derive(life) {
-  const state = { friend:1, companion:0, home:'town', practice:0, voice:false, child:false, called:false, joined:false, distance:false, records:[], tags:{bond:0,dream:0,care:0,self:0} };
-  for (const [step,id] of life.choices.entries()) {
+  const state = { friend:1, companion:0, home:'town', practice:0, voice:false, child:false, called:false, joined:false, distance:false, horizon:0, community:0, vocation:null, detours:[], records:[], tags:{bond:0,dream:0,care:0,self:0} };
+  const visits=life.wander||[];
+  if(!Array.isArray(visits)||visits.length>27)throw new Error('잘못된 산책 기록입니다.');
+  let lastStep=-1;const seen=new Set();
+  for(const v of visits){
+    const key=`${v?.step}:${v?.place}`;
+    if(life.edition!==3||!Number.isInteger(v?.step)||v.step<lastStep||v.step<0||v.step>Math.min(8,life.choices.length)||!Number.isInteger(v.place)||v.place<0||v.place>2||seen.has(key)||!['stay','notice'].includes(v.choice))throw new Error('잘못된 산책 기록입니다.');
+    seen.add(key);lastStep=v.step;
+  }
+  for (let step=0;step<=life.choices.length;step++) {
+    for(const v of visits.filter(v=>v.step===step)){
+      const e=detourFor(life,state,step,v.place),c=e.choices.find(c=>c.id===v.choice);
+      Object.assign(state,c.effect);state.tags[c.tag]+=.25;
+      state.detours.push({step,place:v.place,age:AGES[step],title:c.title,event:e.title,who:c.who,memory:c.memory,echo:c.echo,tag:c.tag});
+    }
+    if(step===life.choices.length)break;
+    const id=life.choices[step];
     const e = sceneFor(life, state, step), selected = e.choices.find(c=>c.id===id);
     if (!selected) throw new Error('이 여정에는 없는 선택입니다.');
     Object.assign(state, selected.effect);
@@ -33,6 +49,7 @@ export function castFor(life) {
 }
 export function sceneFor(life, s = derive(life), step = life.choices.length) {
   const result=buildScene(life,s,step);if(!result)return null;
+  if(life.edition===3)result.choices.push(...extraChoices(life,s,step));
   const cast=castFor(life);
   const replace=value=>typeof value==='string'?value.replace(/(윤|이슬)(이라는|이라고|이|은|을|과)?/g,(_match,old,particle)=>{
     const name=old==='윤'?cast.friend:cast.companion,final=(name.charCodeAt(name.length-1)-44032)%28!==0;
@@ -102,7 +119,17 @@ function buildScene(life, s, step) {
     choice('leave-small','손주',s.tags.care>=s.tags.self?'씨앗 한 봉지 건네기':'여행 수첩 건네기',s.tags.care>=s.tags.self?'천천히 자라는 것을 기다리는 마음을 남긴다.':'다른 사람이 정한 길 밖에도 풍경이 있음을 남긴다.',s.tags.care>=s.tags.self?'care':'self',{},s.tags.care>=s.tags.self?'씨앗 봉투에 아이의 이름을 썼다. 어떤 꽃이 필지는 끝까지 알려주지 않았다.':'수첩의 마지막 장은 비워 두었다. 아이가 처음 보는 세상을 적을 자리가 필요했다.',s.tags.care>=s.tags.self?'내가 보지 못할 봄에, 새로운 꽃이 필 것이다.':'내가 걷지 못한 길에도, 이 작은 시선이 함께할 것이다.',{gift:s.tags.care>=s.tags.self?'care':'self'})]);
   }
 }
-export function currentScene(life) { const s=derive(life); const e=sceneFor(life,s); return e ? {...e,age:AGES[life.choices.length],era:ERAS[life.choices.length],step:life.choices.length,state:s} : null; }
+export function currentScene(life) { const s=derive(life); const e=sceneFor(life,s); return e ? {...e,age:AGES[life.choices.length],era:ERAS[life.choices.length],step:life.choices.length,state:s,places:PLACES[life.choices.length]} : null; }
+export function currentDetour(life,place) {
+  if(life.edition!==3||life.choices.length>=9||!Number.isInteger(place)||place<0||place>2)return null;
+  if(life.wander.some(v=>v.step===life.choices.length&&v.place===place))return null;
+  return detourFor(life,derive(life),life.choices.length,place);
+}
+export function explore(life,place,choiceId) {
+  const e=currentDetour(life,place);
+  if(!e||!e.choices.some(c=>c.id===choiceId))throw new Error('이미 머물렀거나 없는 장소입니다.');
+  return {...life,wander:[...life.wander,{step:life.choices.length,place,choice:choiceId}]};
+}
 export function advance(life, eventId, choiceId) {
   const e=currentScene(life); if (!e || e.id!==eventId || !e.choices.some(c=>c.id===choiceId)) throw new Error('이미 지나갔거나 다른 계절의 선택입니다.');
   return {...life,choices:[...life.choices,choiceId]};
@@ -114,12 +141,13 @@ export function summarize(life) {
   const gift=lastScene.choices.find(c=>c.id===life.choices[8]).gift;
   const titles={bond:'다시 이어진 빛',dream:'멀리 번져 간 노래',care:'곁을 따뜻하게 한 별',self:'자기 속도로 흐른 빛'};
   const lines={bond:'때로 멀어졌고, 때로 다시 만났습니다. 당신은 사람에게 닿는 길을 남겼습니다.',dream:'마음속의 작은 소리가 다른 누군가의 시작이 되었습니다.',care:'당신이 돌본 평범한 날들이 누군가에게는 온 세상이었습니다.',self:'서두르지 않고 바라본 풍경들이 당신만의 하늘을 만들었습니다.'};
-  return {generation:life.ancestors.length+1,seed:life.seed,title:titles[dominant],line:lines[dominant],tag:dominant,gift,records:s.records};
+  if(dominant==='dream'&&s.vocation==='artisan'){titles.dream='다른 손으로 이어진 빛';lines.dream='당신의 손이 고치고 만들던 것들이, 다른 누군가의 시작이 되었습니다.';}
+  return {generation:life.ancestors.length+1,seed:life.seed,title:titles[dominant],line:lines[dominant],tag:dominant,gift,records:s.records,detours:s.detours};
 }
 export function nextGeneration(life, seed) { return newLife(seed,[...life.ancestors,summarize(life)]); }
 function validAncestor(a,index) { return a && a.generation===index+1 && Number.isInteger(a.seed) && a.seed>=0 && a.seed<=4294967295 && typeof a.title==='string' && a.title.length<100 && typeof a.line==='string' && a.line.length<400 && Object.hasOwn(PALETTE,a.tag) && Object.hasOwn(GIFTS,a.gift) && Array.isArray(a.records) && a.records.length===9 && a.records.every((r,i)=>r && r.age===AGES[i] && Object.hasOwn(PALETTE,r.tag) && ['title','memory','echo','who'].every(k=>typeof r[k]==='string' && r[k].length<1000)); }
 export function deserialize(raw) {
-  try { if(typeof raw!=='string' || raw.length>2e6) return null; const life=JSON.parse(raw); if(life.version!==VERSION || !Number.isInteger(life.seed) || life.seed<0 || life.seed>4294967295 || !Array.isArray(life.choices) || life.choices.length>9 || !Array.isArray(life.ancestors) || life.ancestors.length>200 || !life.ancestors.every(validAncestor)) return null; derive(life); return {version:VERSION,seed:life.seed,choices:[...life.choices],ancestors:life.ancestors}; } catch{return null;}
+  try { if(typeof raw!=='string' || raw.length>2e6) return null; const life=JSON.parse(raw); if(life.version!==VERSION || !Number.isInteger(life.seed) || life.seed<0 || life.seed>4294967295 || !Array.isArray(life.choices) || life.choices.length>9 || !Array.isArray(life.ancestors) || life.ancestors.length>200 || !life.ancestors.every(validAncestor)) return null; life.edition??=3;life.wander??=[];if(![2,3].includes(life.edition))return null;derive(life); return {version:VERSION,edition:life.edition,seed:life.seed,choices:[...life.choices],ancestors:life.ancestors,wander:life.wander}; } catch{return null;}
 }
 export function constellationPoints(records, seed) {
   return records.map((r,i)=>{const angle=-Math.PI/2+i*Math.PI*2/records.length;const radius=.72+chance(seed,i+300)*.24;return {x:Math.cos(angle)*radius,y:Math.sin(angle)*radius,tag:r.tag};});
