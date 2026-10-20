@@ -1,4 +1,4 @@
-import {extraChoices,detourFor,PLACES} from './wander.mjs';
+import {extraChoices,detourFor,PLACES} from './wander.mjs?v=0.3.1';
 export const VERSION = 2;
 export const AGES = [8, 16, 24, 33, 42, 53, 64, 75, 84];
 export const ERAS = ['작은 시작','마음이 자라는 날','멀리 가보는 계절','뜻밖의 갈림길','함께 살아가는 날','돌아보는 계절','다시 열리는 문','나누어 갖는 시간','마지막 저녁'];

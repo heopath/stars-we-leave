@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1426">
 <meta name="description" content="우연히 만나고, 선택하며 살아가고, 하나의 별이 되어 다음 세대에 이어지는 이야기."><title>우리가 남긴 별 · 우연과 선택으로 이어지는 삶</title>
-<link rel="icon" href="./star.svg" type="image/svg+xml"><link rel="stylesheet" href="./experience.css"><link rel="stylesheet" href="./exploration.css">
+<link rel="icon" href="./star.svg" type="image/svg+xml"><link rel="stylesheet" href="./experience.css?v=0.3.1"><link rel="stylesheet" href="./exploration.css?v=0.3.1">
 </head>
 <body>
 <canvas id="universe" aria-label="인연의 궤적과 세대를 잇는 별자리"></canvas><div class="atmosphere" aria-hidden="true"></div>
@@ -39,5 +39,5 @@
 <dialog id="help-dialog" class="small-dialog"><button class="close" id="close-help" aria-label="도움말 닫기">×</button><p class="eyebrow">당신의 속도로 걸어요</p><h2>삶에는 정해진 답이 없어요.</h2><ol><li><strong>갈 길을 정하기 전에, 동네를 걸어보세요.</strong><p>상하좌우 어느 방향으로든 움직입니다. 지도에서 장소를 누르면 찾아가고, 가까이에서는 E로 둘러봅니다. 터치 방향 버튼도 사용할 수 있어요.</p></li><li><strong>선택 뒤의 일은 살아보며 알게 됩니다.</strong><p>한 시기에 세 장소, 여섯 갈래의 큰 선택이 있어요. 작은 만남은 나이를 넘기지 않습니다. 여러 곳에 머문 뒤 중요한 선택을 하면 다음 나이로 이어져요.</p></li><li><strong>삶의 끝에서, 다른 삶으로 이어집니다.</strong><p>마지막에 남긴 물건을 손주가 이어받아요. 이전 세대의 별자리는 다음 삶의 하늘에 남습니다.</p></li></ol><p class="gentle-note" id="storage-notice">이 브라우저에 자동 저장됩니다. 시간제한은 없어요.</p><button id="help-done" class="primary">천천히 걸어볼게요 <span>↗</span></button></dialog>
 <dialog id="pause-dialog" class="small-dialog"><p class="eyebrow">A LITTLE PAUSE</p><h2>잠시 쉬어가도 괜찮아요.</h2><p class="story-text">당신이 돌아올 때까지, 이 시간은 여기 머무릅니다.</p><button id="unpause" class="primary">계속 걷기 <span>→</span></button></dialog>
 <dialog id="restart-dialog" class="small-dialog"><p class="eyebrow">새로운 첫 하늘</p><h2>다른 삶을 시작할까요?</h2><p id="restart-message" class="story-text">현재의 진행과 이어진 가족 기록이 새 이야기로 바뀝니다. 기존 별자리를 이어가려면 ‘이어가기’를 선택해 주세요.</p><button id="download-old-save" class="text-button" hidden>이전 기록 파일 내려받기 ↓</button><p id="restart-status" class="gentle-note" role="status"></p><div class="dialog-actions"><button id="restart-confirm" class="primary">새로 시작하기</button><button id="restart-cancel" class="text-button">돌아가기</button></div></dialog>
-<div id="live-region" class="sr-only" aria-live="polite"></div><script type="module" src="./experience.mjs"></script>
+<div id="live-region" class="sr-only" aria-live="polite"></div><script type="module" src="./experience.mjs?v=0.3.1"></script>
 </body></html>

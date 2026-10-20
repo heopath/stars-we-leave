@@ -1,5 +1,5 @@
-import { AGES, PALETTE, GIFTS, chance, castFor, newLife, currentScene, currentDetour, explore, advance, derive, summarize, nextGeneration, deserialize, constellationPoints } from './life.mjs';
-import {WORLD, LANDMARKS, SPAWN, clampPoint, cameraFor,project,unproject,walk} from './world.mjs';
+import { AGES, PALETTE, GIFTS, chance, castFor, newLife, currentScene, currentDetour, explore, advance, derive, summarize, nextGeneration, deserialize, constellationPoints } from './life.mjs?v=0.3.1';
+import {WORLD, LANDMARKS, SPAWN, clampPoint, cameraFor,project,unproject,walk} from './world.mjs?v=0.3.1';
 
 const $ = id => document.getElementById(id);
 const canvas = $('universe'), ctx = canvas.getContext('2d');
