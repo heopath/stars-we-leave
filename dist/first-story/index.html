@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080e20"><meta name="description" content="함께한 시간은 사라지지 않는다. 여섯 번의 선택으로 나만의 별자리를 남기는 짧은 생애 게임.">
+  <title>우리가 남긴 별 · 짧은 생애의 기록</title>
+  <link rel="icon" href="./star.svg" type="image/svg+xml"><link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <canvas id="sky" aria-label="선택한 삶의 궤적이 그려지는 밤하늘"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <header><a class="brand" href="./" aria-label="우리가 남긴 별 처음 화면"><span class="brand-star">✧</span><span>우리가 남긴 별<small>THE LIGHT WE LEAVE</small></span></a>
+    <div class="toolbar"><button id="sound" class="tool" aria-pressed="false" title="소리 켜기"><span aria-hidden="true">♫</span><span class="tool-label">소리 꺼짐</span></button><button id="help" class="tool" aria-label="플레이 방법">?</button><button id="pause" class="tool" hidden aria-label="잠시 멈추기">Ⅱ</button></div>
+  </header>
+  <main>
+    <section id="intro" class="intro">
+      <p class="eyebrow"><span></span> A SMALL LIFE, A LASTING LIGHT</p>
+      <h1>우리가<br>남긴 <em>별</em><span class="title-star" aria-hidden="true">✦</span></h1>
+      <p class="intro-copy">스쳐 간 인연, 마음에 품은 꿈.<br>당신이 걸어온 시간이 하나의 별자리가 됩니다.</p>
+      <div class="start-actions"><button id="start" class="primary">나의 이야기 시작 <span>↗</span></button><button id="resume" class="text-button" hidden>걷던 길 이어가기 →</button></div>
+      <p class="intro-note">여섯 번의 선택 · 짧은 한 생애 · 나만의 별자리</p>
+      <div class="intro-quote"><span class="tiny-star">✧</span><p>함께한 시간은<br>사라지지 않으니까.</p></div>
+    </section>
+    <section id="game" hidden aria-label="생애 탐험">
+      <div class="chapter-info"><p class="eyebrow" id="era"></p><div class="age"><span id="age">8</span><small>살의 나</small></div><p id="chapter-title"></p></div>
+      <nav id="timeline" aria-label="지나온 여섯 계절"></nav>
+      <div id="nodes" class="nodes" aria-label="이번 계절에 만날 수 있는 기억"></div>
+      <div class="narration" id="narration"><p id="chapter-line"></p><span id="move-hint">빛나는 기억을 클릭해 다가가세요</span></div>
+      <aside class="memory-count"><span>✧</span><span id="memory-count">0</span><span>개의 기억</span></aside>
+    </section>
+    <section id="ending" hidden aria-label="나의 별자리">
+      <div class="ending-heading"><p class="eyebrow">EVERY LIFE LEAVES A LIGHT</p><h1>당신이 남긴 별</h1><p id="ending-line"></p></div>
+      <div id="constellation" class="constellation" aria-label="별을 선택해 기억 돌아보기"></div>
+      <div class="ending-footer"><p class="eyebrow" id="constellation-name"></p><p>별에 손을 뻗어, 함께한 시간을 떠올려 보세요.</p><div class="ending-actions"><button id="save-sky" class="secondary">별자리 간직하기 <span>↓</span></button><button id="replay" class="text-button">다른 삶을 살아보기 ↗</button></div><p id="save-notice" class="save-notice" role="status"></p></div>
+    </section>
+  </main>
+  <div id="encounter" class="sheet-wrap" hidden><section class="story-sheet" role="dialog" aria-modal="true" aria-labelledby="encounter-title" tabindex="-1"><button class="close" id="close-encounter" aria-label="다른 빛 둘러보기">×</button><p class="eyebrow" id="encounter-who"></p><h2 id="encounter-title"></h2><p class="story-text" id="encounter-text"></p><p class="time-note">이 계절에는 하나의 시간을 마음에 담을 수 있어요.</p><div class="sheet-actions"><button id="commit" class="primary"></button><button id="explore" class="text-button">다른 빛 둘러보기</button></div></section></div>
+  <div id="reflection" class="sheet-wrap" hidden><section class="story-sheet reflection" role="dialog" aria-modal="true" aria-labelledby="reflection-title" tabindex="-1"><p class="eyebrow">A MOMENT TO KEEP</p><span class="reflection-star" aria-hidden="true">✦</span><h2 id="reflection-title"></h2><p class="story-text" id="reflection-text"></p><p class="after-text" id="after-text"></p><button id="continue" class="primary">다음 계절로 <span>→</span></button></section></div>
+  <div id="memory" class="sheet-wrap" hidden><section class="story-sheet" role="dialog" aria-modal="true" aria-labelledby="memory-title" tabindex="-1"><button id="close-memory" class="close" aria-label="별자리로 돌아가기">×</button><p class="eyebrow" id="memory-age"></p><h2 id="memory-title"></h2><p class="story-text" id="memory-text"></p><p class="after-text" id="memory-after"></p><button id="back-to-sky" class="text-button">별자리로 돌아가기 ↗</button></section></div>
+  <div id="help-dialog" class="overlay" hidden><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" tabindex="-1"><p class="eyebrow">HOW TO PLAY</p><h2 id="help-title">당신의 속도로 걸어요.</h2><p>당신은 금빛으로 빛나는 작은 별입니다.<br>하늘의 기억을 누르면 그 빛을 향해 움직입니다.</p><ol><li><strong>빛에 다가가기</strong><span>기억을 클릭하거나 터치하세요. 방향키 또는 WASD로도 움직일 수 있어요.</span></li><li><strong>하나의 시간 선택하기</strong><span>이야기를 읽고 마음에 드는 시간을 담으세요. 선택하기 전까지 다른 기억도 둘러볼 수 있어요.</span></li><li><strong>나만의 별자리 만나기</strong><span>여섯 계절을 지나면 모든 기억이 별이 됩니다. 별을 눌러 다시 떠올려 보세요.</span></li></ol><p class="help-note">시간제한 없이 플레이할 수 있어요. 선택은 이 브라우저에 자동 저장됩니다.</p><button id="close-help" class="primary">알겠어요 <span>↗</span></button></section></div>
+  <div id="pause-dialog" class="overlay" hidden><section class="dialog small-dialog" role="dialog" aria-modal="true" aria-labelledby="pause-title" tabindex="-1"><p class="eyebrow">A LITTLE PAUSE</p><h2 id="pause-title">잠시 쉬어가도 괜찮아요.</h2><p>당신의 별은 여기서 기다릴게요.</p><button id="unpause" class="primary">계속 걷기 <span>→</span></button></section></div>
+  <div id="restart-dialog" class="overlay" hidden><section class="dialog small-dialog" role="dialog" aria-modal="true" aria-labelledby="restart-title" tabindex="-1"><p class="eyebrow">ANOTHER LIFE</p><h2 id="restart-title">새로운 길을 걸어볼까요?</h2><p>현재 여정의 자동 저장이 새 이야기로 바뀝니다.<br>완성한 별자리는 먼저 이미지로 간직할 수 있어요.</p><div class="sheet-actions"><button id="confirm-restart" class="primary">새 이야기 시작</button><button id="cancel-restart" class="text-button">돌아가기</button></div></section></div>
+  <footer id="footer"><span>한 사람의 삶은, 하나의 작은 우주.</span><span>첫 번째 이야기 <i>✧</i> v0.1</span></footer>
+  <div id="live" class="sr-only" aria-live="polite"></div>
+  <script type="module" src="./app.mjs"></script>
+</body></html>
